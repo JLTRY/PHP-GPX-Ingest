@@ -11,46 +11,50 @@
 *
 * Where issue keys are included (GPXIN-[0-9]+), the relevant issue can be viewed at http://projects.bentasker.co.uk/jira_projects/browse/GPXIN.html
 */
-
 namespace GPXIngest;
+$LOGFILE=dirname(__FILE__)."/log.txt";
+if (file_exists($LOGFILE)){
+	unlink($LOGFILE);
+}
+
+
 
 class GPXIngest{
 
-	private $file;
-	private $xml;
-	private $journey;
-	private $tracks = array();
-	private $highspeeds;
-	private $lowspeeds;
-	private $journeyspeeds;
-	private $totaltimes;
-	private $ftimes;
-	private $trackduration;
-	private $smarttrack=true;
-	private $smarttrackthreshold = 3600;
-	private $suppresscalcdistance = false;
-	private $suppresslocation = false;
-	private $suppressspeed = false;
-	private $suppresselevation = false;
-	private $suppressdate = false;
-	private $suppresswptlocation = false;
-	private $suppresswptele = false;	
-	private $lastspeed = false;
-	private $lastspeedm = false;
-	private $lastrteele = false;
-	private $rteeledev = array();
-	private $journeylats;
-	private $journeylons;
-	private $segmentlats;
-	private $segmentlons;
-	private $tracklats;
-	private $tracklons;
-	private $ingest_version = 1.03;
-	private $entryperiod = 0;
-	private $experimentalFeatures = array('calcElevationGain'); // See GPXIN-17
-	private $featuretoggle = array();
-	private $waypoints;
-
+	protected $file;
+	protected $xml;
+	protected $journey;
+	protected $tracks = array();
+	protected $highspeeds;
+	protected $lowspeeds;
+	protected $journeyspeeds;
+	protected $totaltimes;
+	protected $ftimes;
+	protected $trackduration;
+	protected $smarttrack=true;
+	protected $smarttrackthreshold = 3600;
+	protected $suppresscalcdistance = false;
+	protected $suppresslocation = false;
+	protected $suppressspeed = false;
+	protected $suppresselevation = false;
+	protected $suppressdate = false;
+	protected $suppresswptlocation = false;
+	protected $suppresswptele = false;	
+	protected $lastspeed = false;
+	protected $lastspeedm = false;
+	protected $lastrteele = false;
+	protected $rteeledev = array();
+	protected $journeylats;
+	protected $journeylons;
+	protected $segmentlats;
+	protected $segmentlons;
+	protected $tracklats;
+	protected $tracklons;
+	protected $ingest_version = 1.03;
+	protected $entryperiod = 0;
+	protected $experimentalFeatures = array('calcElevationGain'); // See GPXIN-17
+	protected $featuretoggle = array();
+	protected $waypoints;
 
 
 	/** Standard constructor
@@ -80,7 +84,7 @@ class GPXIngest{
 	*
 	*/
 	public function loadFile($file){
-		$this->xml = simplexml_load_file($file);
+		$this->xml = simplexml_load_file($file, "SimpleXMLElement");//, 0, "https://www8.garmin.com/xmlschemas/ActivityExtensionv2.xsd", TRUE);
 		if ($this->xml){
 			return true;
 		}else{
@@ -624,7 +628,7 @@ class GPXIngest{
 	*
 	* @return mixed
 	*/
-	private function generateAggregatedTrackStats(){
+	protected function generateAggregatedTrackStats(){
 		// Finalise the object stats - again take suppression into account
 
 		if (!isset($this->journey->journeys)){
@@ -636,7 +640,7 @@ class GPXIngest{
 			$this->journey->stats->end = max($this->totaltimes);
 		}
 
-		if (!$this->suppressspeed){
+		if (!$this->suppressspeed && sizeof($this->highspeeds)){
                         $modesearch = array_count_values($this->journeyspeeds);
 			$this->journey->stats->maxSpeed = max($this->highspeeds);
 			$this->journey->stats->minSpeed = min($this->lowspeeds);
@@ -662,7 +666,7 @@ class GPXIngest{
 				0;
 
 		}
-		if (!$this->suppresselevation){
+		if (!$this->suppresselevation && sizeof($this->jeles)){
 			$this->journey->stats->elevation = new \stdClass();
 			$this->journey->stats->elevation->max = max($this->jeles);
 			$this->journey->stats->elevation->min = min($this->jeles);
@@ -689,7 +693,7 @@ class GPXIngest{
 	*
 	* @return stdclass
 	*/
-	private function buildBoundsObj(){
+	protected function buildBoundsObj(){
                 $bounds = new \stdClass();
                 $bounds->Lat = new \stdClass();
                 $bounds->Lat->min = 0;
@@ -709,7 +713,7 @@ class GPXIngest{
 	*
 	* @return stdclass
 	*/
-	private function buildWptType($wpt){
+	protected function buildWptType($wpt){
 		$waypoint = new \stdClass();
 		$waypoint->name = ($wpt->name)? (string) $wpt->name : null;
 		$waypoint->description = ($wpt->desc)? (string) $wpt->desc : null;
@@ -771,7 +775,7 @@ class GPXIngest{
 	* @return array - acceleration and deceleration.
 	*
 	*/
-	private function calculateAcceleration($speed,$timestamp,$unit){
+	protected function calculateAcceleration($speed,$timestamp,$unit){
 		$acceleration = 0;
 		$deceleration = 0;
 
@@ -839,7 +843,7 @@ class GPXIngest{
 	/** Update the Journey object's metadata to include details of what information (if any) was suppressed at ingest
 	*
 	*/
-	private function writeSuppressionMetadata(){
+	protected function writeSuppressionMetadata(){
 
 		if ($this->suppresslocation){
 			$this->journey->metadata->suppression[] = 'location';
@@ -866,7 +870,7 @@ class GPXIngest{
 	/** Generate a track identifier
 	*
 	*/
-	private function genTrackKey($i){
+	protected function genTrackKey($i){
 		return "journey$i";
 	}
 
@@ -875,7 +879,7 @@ class GPXIngest{
 	/** Generate a segment identifier
 	*
 	*/
-	private function genSegKey($i){
+	public function genSegKey($i){
 		return "seg$i";
 	}
 
@@ -885,7 +889,7 @@ class GPXIngest{
 	/** Initialise a Segment object
 	*
 	*/
-	private function initSegment($jkey,$segkey){
+	protected function initSegment($jkey,$segkey){
 		$this->journey->journeys->$jkey->segments->$segkey = new \stdClass();
 		$this->lasttimestamp = false;
 		$this->lastpos = false;
@@ -901,7 +905,7 @@ class GPXIngest{
 	/** Initialise a track object
 	*
 	*/
-	private function initTrack($jkey,$trk){
+	protected function initTrack($jkey,$trk){
 
 		if (!isset($this->journey->journeys)){
 		    $this->journey->journeys = new \stdClass();
@@ -942,7 +946,7 @@ class GPXIngest{
 	/** Write stats for the current segment
 	*
 	*/
-	private function writeSegmentStats($jkey,$segkey,$times,$x,$uom,$timemoving,$timestationary){
+	protected function writeSegmentStats($jkey,$segkey,$times,$x,$uom,$timemoving,$timestationary){
 
 		if (!isset($this->journey->journeys->$jkey->segments->$segkey->stats)){
 			$this->journey->journeys->$jkey->segments->$segkey->stats = new \stdClass();
@@ -950,10 +954,15 @@ class GPXIngest{
 
 		if (!$this->suppressspeed){
 			$modesearch = array_count_values($this->sspeed);
-			$this->journey->journeys->$jkey->segments->$segkey->stats->avgspeed = round($this->speed/$x,2);
-			$this->journey->journeys->$jkey->segments->$segkey->stats->modalSpeed = array_search(max($modesearch), $modesearch);
-			$this->journey->journeys->$jkey->segments->$segkey->stats->minSpeed = min($this->sspeed);
-			$this->journey->journeys->$jkey->segments->$segkey->stats->maxSpeed = max($this->sspeed);
+			if ($x!=0)
+				$this->journey->journeys->$jkey->segments->$segkey->stats->avgspeed = round($this->speed/$x,2);
+			if (is_array($modesearch) && count($modesearch))	
+				$this->journey->journeys->$jkey->segments->$segkey->stats->modalSpeed = array_search(max($modesearch), $modesearch);
+			if (is_array($this->sspeed) && count($this->sspeed))
+			{
+				$this->journey->journeys->$jkey->segments->$segkey->stats->minSpeed = min($this->sspeed);
+				$this->journey->journeys->$jkey->segments->$segkey->stats->maxSpeed = max($this->sspeed);
+			}	
 			$this->journey->journeys->$jkey->segments->$segkey->stats->speedUoM = $uom;
 
 		}
@@ -963,14 +972,16 @@ class GPXIngest{
 		if (!$this->suppresslocation){
 			$this->journey->journeys->$jkey->segments->$segkey->stats->distanceTravelled = array_sum($this->sdist);
                         $this->journey->journeys->$jkey->segments->$segkey->stats->bounds = $this->buildBoundsObj(); //GPXIN-26
-			$this->journey->journeys->$jkey->segments->$segkey->stats->bounds->Lat->min = min($this->segmentlats);
-			$this->journey->journeys->$jkey->segments->$segkey->stats->bounds->Lat->max = max($this->segmentlats);
-			$this->journey->journeys->$jkey->segments->$segkey->stats->bounds->Lon->min = min($this->segmentlons);
-			$this->journey->journeys->$jkey->segments->$segkey->stats->bounds->Lon->max = max($this->segmentlons);
+			$min = is_array($this->segmentlats) && count($this->segmentlats)? min($this->segmentlats): 0;
+			$max = is_array($this->segmentlats) && count($this->segmentlats)? max($this->segmentlats): 0;
+			$this->journey->journeys->$jkey->segments->$segkey->stats->bounds->Lat->min = $min;
+			$this->journey->journeys->$jkey->segments->$segkey->stats->bounds->Lat->max = $max;
+			$this->journey->journeys->$jkey->segments->$segkey->stats->bounds->Lon->min = $min;
+			$this->journey->journeys->$jkey->segments->$segkey->stats->bounds->Lon->max = $max;
 		}
 
 
-		if (!$this->suppressdate){
+		if (!$this->suppressdate && sizeof($times)){
 			$start = min($times);
 			$end = max($times);
 			$duration = $end - $start;
@@ -987,7 +998,7 @@ class GPXIngest{
 			$this->ftimes[] = $this->journey->journeys->$jkey->segments->$segkey->stats->end;
 		}
 
-		if (!$this->suppresselevation){
+		if (!$this->suppresselevation && sizeof($this->seles)){
 			$this->journey->journeys->$jkey->segments->$segkey->stats->elevation = new \stdClass();
 			$this->journey->journeys->$jkey->segments->$segkey->stats->elevation->max = max($this->seles);
 			$this->journey->journeys->$jkey->segments->$segkey->stats->elevation->min = min($this->seles);
@@ -1024,7 +1035,7 @@ class GPXIngest{
 	/** Write stats for the current track
 	*
 	*/
-	private function writeTrackStats($jkey){
+	protected function writeTrackStats($jkey){
 
 		// If speed is suppressed we'll have pushed 1 into the array for each trackpart.
 		$ptcount = count($this->fspeed);
@@ -1059,8 +1070,11 @@ class GPXIngest{
 			}
 
 			// Add the calculated max/min speeds to the Journey wide stats
-			$this->highspeeds[] = $this->journey->journeys->$jkey->stats->maxSpeed;
-			$this->lowspeeds[] = $this->journey->journeys->$jkey->stats->minSpeed;
+			if (is_array($this->fspeed) && count($this->fspeed))
+			{
+				$this->highspeeds[] = $this->journey->journeys->$jkey->stats->maxSpeed;
+				$this->lowspeeds[] = $this->journey->journeys->$jkey->stats->minSpeed;
+			}	
 		}
 
 		if (!$this->suppresslocation){
@@ -1073,7 +1087,7 @@ class GPXIngest{
 			$this->journey->journeys->$jkey->stats->bounds->Lon->max = max($this->tracklons);
 		}
 
-		if (!$this->suppressdate){
+		if (!$this->suppressdate && sizeof($this->ftimes)){
 			// Finalise the track stats
 			$this->journey->journeys->$jkey->stats->start = min($this->ftimes);
 			$this->journey->journeys->$jkey->stats->end = max($this->ftimes);
@@ -1086,7 +1100,7 @@ class GPXIngest{
 			$this->journey->stats->recordedDuration = $this->journey->stats->recordedDuration + $this->trackduration;
 		}
 
-		if (!$this->suppresselevation){
+		if (!$this->suppresselevation && sizeof($this->feles)){
 			$this->journey->journeys->$jkey->stats->elevation = new \stdClass();
 			$this->journey->journeys->$jkey->stats->elevation->max = max($this->feles);
 			$this->journey->journeys->$jkey->stats->elevation->min = min($this->feles);
@@ -1121,8 +1135,8 @@ class GPXIngest{
 	  $dist = acos(sin(deg2rad($old[0])) * sin(deg2rad($new[0])) + cos(deg2rad($old[0])) * cos(deg2rad($new[0])) * cos(deg2rad($theta)));
 	  $dist = rad2deg($dist);
 
-	  $res = round(($dist * 60 * 1.1515) * 5280,3); // Convert to feet and round to 3 decimal places
-
+	  //$res = round(($dist * 60 * 1.1515) * 5280,3); // Convert to feet and round to 3 decimal places
+	  $res = $dist * 6371 ; 
 	  return (is_nan($res))? 0 : $res;
 	}
 
@@ -1130,7 +1144,7 @@ class GPXIngest{
 	/** Reset the track stats counter
 	*
 	*/
-	private function resetTrackStats(){
+	protected function resetTrackStats(){
 		$this->ftimes = array();
 		$this->fspeed = array();
 		$this->trackduration = 0;
@@ -1147,7 +1161,7 @@ class GPXIngest{
 	/** Reset the segments stats counter
 	*
 	*/
-	private function resetSegmentStats(){
+	protected function resetSegmentStats(){
 		$this->speed = 0;
 		$this->sspeed = array();
 		$this->seles = array();
